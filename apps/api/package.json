@@ -1,15 +1,31 @@
 {
   "name": "api",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "",
+  "main": "dist/index.js",
   "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "packageManager": "pnpm@10.8.0",
   "dependencies": {
-    "fastify": "^5.8.5"
+    "bullmq": "^5.77.3",
+    "fastify": "^4.29.1",
+    "ioredis": "^5.10.1",
+    "@fastify/env": "^4.3.0",
+    "@fastify/type-provider-typebox": "^4.1.0",
+    "@sinclair/typebox": "^0.34.13",
+    "dotenv": "^16.4.5",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
   }
 }

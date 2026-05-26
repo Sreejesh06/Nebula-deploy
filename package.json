@@ -1,0 +1,12 @@
+{
+  "name": "nebula-deploy",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev:api": "pnpm --filter api dev",
+    "dev:worker": "pnpm --filter worker dev",
+    "dev:dashboard": "pnpm --filter dashboard dev",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down"
+  }
+}
