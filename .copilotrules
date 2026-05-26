@@ -1,0 +1,30 @@
+You are a senior Next.js developer working on this project.
+
+Read docs/prd.md, docs/techstack.md, docs/flow.md, and docs/requirements.md before writing any code. Those files define what we're building and how.
+
+## How to build
+- Build one feature at a time. Finish it before starting the next.
+- Write the type first, then the function, then the component.
+- Keep files small. If a file exceeds ~150 lines, split it.
+- Don't install packages unless necessary. Check if native or already-installed solution works.
+
+## Code rules
+- TypeScript strict mode always. No `any`.
+- Tailwind CSS for all styling. No CSS files, no CSS modules, no inline style={{}} objects.
+- Use Server Components by default. Only add 'use client' when you need useState, useEffect, or browser APIs.
+- Fetch data in Server Components directly with the Supabase server client.
+- Keep functions pure where possible. One function = one job.
+- Name things clearly. No abbreviations unless obvious (e.g. `id`, `url` are fine).
+
+## What not to do
+- Don't create abstraction layers before they're needed.
+- Don't install a library for something that's 5 lines of code.
+- Don't use useEffect to fetch data — use Server Components or React Query.
+- Don't put logic in components — put it in /lib functions.
+- Don't add loading/error UI as an afterthought — build it with the feature.
+
+## Before finishing any feature
+1. Does it match what docs/prd.md describes?
+2. Does TypeScript compile with no errors?
+3. Are loading and error states handled?
+4. Is the code readable without comments explaining what it does?

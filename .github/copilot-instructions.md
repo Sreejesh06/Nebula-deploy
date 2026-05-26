@@ -1,164 +1,106 @@
 # NebulaDeploy — Copilot Instructions
 
-## Project Vision
-NebulaDeploy is a self-hosted deployment platform — a mini Vercel.
-When a developer pushes code to GitHub, this system:
-1. Receives a webhook from GitHub
-2. Enqueues a build job
-3. Clones the repo and runs the build inside an isolated Docker container
-4. Uploads the build artifact to MinIO (S3-compatible storage)
-5. Updates the route registry so Traefik serves the new build at a preview URL
-6. Streams build logs in real-time to the dashboard via WebSockets
+## What this project is
+A self-hosted deployment platform (mini Vercel).
+git push → webhook → build in Docker → upload artifact → serve at preview URL.
 
 ## Monorepo Structure
-/apps
-  /api          → Fastify REST API server (main backend)
-  /worker       → BullMQ build worker (separate long-running process)
-  /dashboard    → Next.js 14 frontend (App Router)
-/packages
-  /types        → shared TypeScript types used across apps
-  /config       → shared zod schemas and environment validation
+/apps/api          → Fastify backend
+/apps/worker       → BullMQ build worker (separate process)
+/apps/dashboard    → Next.js 14 frontend
+/packages/types    → shared TypeScript types
 
-## Full Tech Stack
+## Stack (non-negotiable)
+- API: Fastify v4 + TypeScript — NEVER Express
+- ORM: Prisma — NEVER raw SQL or other ORMs
+- Queue: BullMQ + Redis
+- Worker: dockerode, simple-git, minio JS SDK
+- Frontend: Next.js 14 App Router + Tailwind + TanStack Query
+- Validation: zod ONLY for env vars at startup and webhook body — nowhere else
+- Reverse proxy: Traefik v3 (file provider)
 
-### Backend (apps/api)
-- Runtime: Node.js 20
-- Framework: Fastify v4 (NEVER Express)
-- Language: TypeScript strict mode
-- ORM: Prisma (NEVER raw SQL, NEVER other ORMs)
-- Validation: zod (validate ALL external input)
-- Auth: JWT via @fastify/jwt
-- WebSockets: @fastify/websocket
-- Environment: @fastify/env with zod schema
-
-### Worker (apps/worker)
-- Queue: BullMQ (backed by Redis)
-- Docker control: dockerode (Node.js Docker SDK)
-- File upload: minio (official MinIO JS SDK)
-- Git: simple-git
-
-### Frontend (apps/dashboard)
-- Framework: Next.js 14 with App Router
-- Language: TypeScript strict mode
-- Styling: Tailwind CSS
-- Data fetching: TanStack Query (React Query)
-- WebSocket client: native browser WebSocket
-- Forms: react-hook-form + zod resolver
-
-### Infrastructure
-- Database: PostgreSQL 16 via Prisma
-- Queue/Cache: Redis 7 via BullMQ
-- Object Storage: MinIO (S3-compatible)
-- Reverse Proxy: Traefik v3 (dynamic file provider for routing)
-- Containers: Docker (worker spawns sibling containers via Docker socket)
-
-## Database Models (Prisma)
-The core models are:
-
-Project {
-  id, name, repoUrl, teamId,
-  activeDeployId (FK to Deploy),
-  createdAt
-}
-
-Deploy {
-  id, projectId, commitSha, branch, status,
-  artifactKey, artifactHash, previewUrl,
-  buildDurationMs, nebulaConfig (Json),
-  statusUpdatedAt, createdAt
-}
-Deploy.status enum: QUEUED | BUILDING | UPLOADING | ACTIVATING | READY | FAILED
-
-Route {
-  id, host, deployId, projectId,
-  isPrimary, createdAt
-}
-
-## Environment Variables
-Always read from process.env. Always validate at startup with zod. Never hardcode.
-API env vars: DATABASE_URL, REDIS_URL, MINIO_ENDPOINT, MINIO_PORT,
-MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_BUCKET, GITHUB_WEBHOOK_SECRET,
-JWT_SECRET, PORT, NODE_ENV
-Worker env vars: DATABASE_URL, REDIS_URL, MINIO_*, DOCKER_SOCKET_PATH
-
-## Code Style Rules
-- TypeScript ONLY — never write plain .js files
-- async/await ONLY — never .then() chains
-- named exports ONLY — no default exports except Next.js pages/layouts
-- Always type Fastify routes with TypeScript generics for request body/params/query
+## Code Rules
+- TypeScript only — never .js files
+- async/await only — never .then() or callbacks
+- named exports only — default exports only in Next.js pages/layouts
 - Always wrap route handlers in try/catch
-- Always log errors with a logger (fastify.log.error), never console.log in production code
-- Use fastify.register() for all route groups
-- Use fastify-plugin for shared decorators (db, redis, auth)
+- Never use console.log — use fastify.log.error / fastify.log.info
+- Never hardcode secrets or URLs — always process.env
+- Use fastify.register() for route groups
+- Use fastify-plugin for shared decorators (db, redis)
+
+## Zod Usage (keep it simple)
+Only use zod in TWO places:
+1. Env validation at startup in both api and worker — fail fast if vars are missing
+2. GitHub webhook body — it's untrusted external input
+
+Do NOT use zod for: internal functions, route schemas, frontend forms, anywhere else.
+Use TypeScript types for everything else.
 
 ## Fastify Route Pattern
-Every route file must follow this pattern:
 ```typescript
-import { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { Type } from '@sinclair/typebox'
+import type { FastifyPluginAsync } from 'fastify'
 
-const route: FastifyPluginAsyncTypebox = async (fastify) => {
-  fastify.post('/webhooks/github', {
-    schema: {
-      body: Type.Object({ ... }),
-      response: { 200: Type.Object({ ... }) }
+const webhookRoutes: FastifyPluginAsync = async (fastify) => {
+  fastify.post<{ Body: WebhookBody }>('/webhooks/github', async (request, reply) => {
+    try {
+      // handler
+    } catch (err) {
+      fastify.log.error(err)
+      return reply.status(500).send({ error: 'internal server error' })
     }
-  }, async (request, reply) => {
-    // handler
   })
 }
 
-export default route
+export { webhookRoutes }
 ```
 
-## BullMQ Job Pattern
-Jobs go in apps/worker/src/jobs/.
-Each job file exports a processor function typed with BullMQ's Processor<JobData, JobResult>.
-Job names are string enums defined in packages/types.
+## BullMQ Pattern
+- Queue defined in apps/api/src/lib/queue.ts
+- Job processors in apps/worker/src/jobs/
+- Job types (name + data shape) defined in packages/types/index.ts
 
-## Feature Build Order (follow this sequence)
-Phase 1 - Core pipeline:
-  1. Fastify server bootstrap with env validation
-  2. Prisma schema + migrations
-  3. GitHub webhook receiver with HMAC validation
+## Database Models
+```
+Project  { id, name, repoUrl, activeDeployId, createdAt }
+Deploy   { id, projectId, commitSha, branch, status, artifactKey, artifactHash, previewUrl, buildDurationMs, nebulaConfig, statusUpdatedAt, createdAt }
+Route    { id, host, deployId, projectId, isPrimary, createdAt }
+
+Deploy status enum: QUEUED | BUILDING | UPLOADING | ACTIVATING | READY | FAILED
+```
+
+## Build Order (follow this, do not skip ahead)
+Phase 1 — core pipeline:
+  1. Fastify server bootstrap + zod env validation
+  2. Prisma schema + migrate
+  3. GitHub webhook receiver + HMAC validation
   4. BullMQ queue setup
-  5. Build worker: clone → docker build → capture logs
+  5. Build worker: clone → Docker container → stream logs
   6. MinIO artifact upload
-  7. Traefik route registry update
-  8. Preview URL generation
+  7. Traefik dynamic config write → preview URL live
 
-Phase 2 - Realtime:
-  9. Redis pub/sub log streaming
-  10. WebSocket endpoint in API
-  11. Next.js dashboard: deploy list, live log viewer
+Phase 2 — realtime:
+  8. Redis pub/sub log streaming
+  9. WebSocket endpoint in API
+  10. Next.js dashboard: project list, deploy history, live log viewer
 
-Phase 3 - Hard engineering:
-  12. Docker resource limits (memory, CPU, network isolation)
-  13. Content-addressed artifact storage (SHA-256 dedup)
-  14. Atomic route registry with PostgreSQL advisory locks
-  15. Rollback endpoint
-  16. Worker concurrency control with Redis counter
+Phase 3 — hard engineering:
+  11. Docker resource limits (512MB RAM, 1 CPU, --network=none)
+  12. Content-addressed artifact dedup (SHA-256 hash)
+  13. Rollback endpoint (swap Traefik pointer, no rebuild)
+  14. Worker concurrency control (Redis INCR/DECR counter)
 
-Phase 4 - Open source tier:
-  17. nebula.json route rules → Traefik middleware chain
-  18. nebula-cli npm package
-  19. Deploy diff viewer (git diff between deploys)
-  20. GitHub PR status checks via GitHub App
+Phase 4 — open source tier:
+  15. nebula.json route rules → Traefik middleware chain
+  16. nebula-cli npm package (deploy, rollback, logs commands)
+  17. Deploy diff viewer (git diff --stat between commits)
+  18. GitHub PR status checks
 
-## What Copilot Should Always Do
-- When creating a new feature, start with the zod schema
-- Then the Prisma model if DB is involved
-- Then the Fastify route with full TypeScript types
-- Then export types to packages/types
-- Always suggest error cases and edge cases
-- Always suggest the corresponding BullMQ job if the feature involves async work
-
-## What Copilot Should NEVER Do
-- Use Express instead of Fastify
-- Use mongoose, knex, or raw pg instead of Prisma
+## NEVER
+- Use Express
+- Use mongoose, knex, or raw pg
 - Use .then() or callbacks
-- Hardcode any URL, secret, or config value
-- Use console.log (use fastify.log or a passed logger)
-- Skip zod validation on any external input
-- Write a feature without TypeScript types
-- Use default exports except in Next.js files
+- Hardcode any value that should be in .env
+- Use console.log
+- Use zod outside of env validation and webhook body
+- Write plain .js files
