@@ -3,24 +3,26 @@
 ## Frontend
 - Next.js 14 (App Router)
 - TypeScript (strict mode)
-- Tailwind CSS — all styling, no custom CSS files
-- Lucide React — icons only
+- Tailwind CSS
+- TanStack Query
 
-## Backend / Database
-- Supabase — database, auth, storage
-- Supabase Auth — email/password to start
-- Supabase Realtime — only if the feature needs it
+## Backend / Storage
+- Fastify v4 API
+- Prisma ORM
+- BullMQ + Redis
+- Docker (build sandbox)
+- MinIO (artifact storage)
+- Traefik v3 (reverse proxy, file provider)
 
 ## Key decisions
-- No Redux or Zustand unless state gets genuinely complex. Start with useState + context.
-- No ORM. Use Supabase client directly.
-- No component library (shadcn/ui is fine if needed, but don't install it preemptively).
-- Fetch data in Server Components where possible. Use client components only when you need interactivity.
-- Keep API routes thin. Logic goes in /lib functions.
+- Fastify only. No Express.
+- Prisma only. No raw SQL.
+- Zod only for env validation and GitHub webhook body.
+- Named exports only (default exports only in Next.js pages/layouts).
+- Async/await only; no .then() chains.
 
-## Folder structure
-src/
-  app/          → Next.js pages and layouts
-  components/   → shared UI components
-  lib/          → helper functions, Supabase client, utilities
-  types/        → TypeScript interfaces and types
+## Monorepo structure
+/apps/api          → Fastify backend
+/apps/worker       → BullMQ build worker
+/apps/dashboard    → Next.js 14 frontend
+/packages/types    → shared TypeScript types

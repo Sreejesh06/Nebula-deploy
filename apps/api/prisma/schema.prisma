@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Project {
+  id             String   @id @default(cuid())
+  name           String
+  repoUrl        String
+  activeDeployId String?
+  activeDeploy   Deploy?  @relation("ActiveDeploy", fields: [activeDeployId], references: [id])
+  deploys        Deploy[] @relation("ProjectDeploys")
+  routes         Route[]
+  createdAt      DateTime @default(now())
+}
+
+model Deploy {
+  id               String       @id @default(cuid())
+  projectId        String
+  project          Project      @relation("ProjectDeploys", fields: [projectId], references: [id])
+  commitSha        String
+  branch           String
+  status           DeployStatus @default(QUEUED)
+  artifactKey      String?
+  artifactHash     String?
+  previewUrl       String?
+  buildDurationMs  Int?
+  nebulaConfig     Json?
+  diffStat         String?
+  statusUpdatedAt  DateTime     @default(now())
+  createdAt        DateTime     @default(now())
+  routes           Route[]
+  activeForProject Project[]    @relation("ActiveDeploy")
+}
+
+model Route {
+  id        String   @id @default(cuid())
+  host      String   @unique
+  deployId  String
+  deploy    Deploy   @relation(fields: [deployId], references: [id])
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+enum DeployStatus {
+  QUEUED
+  BUILDING
+  UPLOADING
+  ACTIVATING
+  READY
+  FAILED
+}

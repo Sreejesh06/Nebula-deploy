@@ -1,7 +1,7 @@
-# [APP NAME]
+# NebulaDeploy
 
 ## What this repo is
-This project uses a docs-first vibe coding approach.
+This project uses a docs-first build approach.
 Before writing code, the plan lives in the docs/ folder.
 Read those files to understand what's being built and why.
 
@@ -10,25 +10,18 @@ Read those files to understand what's being built and why.
 |------|---------------|
 | docs/prd.md | what we're building and for who |
 | docs/techstack.md | stack decisions and folder structure |
-| docs/flow.md | how users move through the app |
-| docs/requirements.md | database schema and technical constraints |
+| docs/flow.md | how users move through the system |
+| docs/requirements.md | data model and technical constraints |
 
 ## How to add a new feature
 1. Add the feature to docs/prd.md under Core Features
-2. Add any new DB tables to docs/requirements.md
-3. Add the user flow to docs/flow.md if it's a new screen
+2. Add or update data models in docs/requirements.md
+3. Add the flow to docs/flow.md if it changes behavior
 4. Open Copilot Agent, attach the relevant docs file, and say: "Build [feature name] as described in docs/prd.md"
 
 ## Setup
-```bash
-npm install
-cp .env.example .env.local
-# fill in your Supabase URL and anon key
-npm run dev
-```
-
-## Env vars needed
-```
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-```
+See docs for stack and configuration. This repo is a monorepo with:
+- apps/api (Fastify + Prisma)
+- apps/worker (BullMQ + Docker + MinIO)
+- apps/dashboard (Next.js 14)
+- packages/types (shared types)
